@@ -1,0 +1,11 @@
+[project]
+name = "passwordless-auth"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.120.0",
+    "uvicorn>=0.38.0",
+    "webauthn>=2.7.0",
+]

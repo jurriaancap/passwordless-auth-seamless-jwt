@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebAuthn Test - Passwordless Authentication Workflow</title>
+    <meta charset="utf-8" />
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+        h1 { color: #333; text-align: center; margin-bottom: 30px; font-size: 28px; }
+        
+        .workflow-step { 
+            margin: 25px 0; 
+            padding: 20px; 
+            border-radius: 8px; 
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s ease;
+        }
+        .workflow-step.active { border-color: #4CAF50; background: #f8fff8; }
+        .workflow-step.completed { border-color: #2196F3; background: #f0f8ff; }
+        .workflow-step.disabled { opacity: 0.6; pointer-events: none; }
+        
+        .step-header { 
+            display: flex; 
+            align-items: center; 
+            margin-bottom: 15px; 
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .step-number { 
+            background: #667eea; 
+            color: white; 
+            width: 32px; 
+            height: 32px; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            margin-right: 12px; 
+            font-weight: bold;
+        }
+        .step-number.completed { background: #4CAF50; }
+        .step-number.active { background: #ff9800; }
+        
+        .step-content { margin-left: 44px; }
+        .step-description { color: #666; margin-bottom: 15px; font-size: 14px; }
+        
+        button { 
+            padding: 12px 20px; 
+            margin: 8px 8px 8px 0; 
+            font-size: 14px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        
+        .btn-primary { background: #4CAF50; color: white; }
+        .btn-secondary { background: #2196F3; color: white; }
+        .btn-accent { background: #ff9800; color: white; }
+        .btn-muted { background: #f5f5f5; color: #333; border: 1px solid #ddd; }
+        
+        input { 
+            padding: 12px; 
+            margin: 8px 0; 
+            width: 280px; 
+            border: 2px solid #ddd; 
+            border-radius: 6px; 
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+        input:focus { outline: none; border-color: #4CAF50; }
+        
+        .result { 
+            margin: 15px 0; 
+            padding: 15px; 
+            border-radius: 6px; 
+            display: none; 
+            white-space: pre-wrap; 
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .error { background: #ffebee; color: #c62828; border-left: 4px solid #f44336; }
+        .success { background: #e8f5e8; color: #2e7d32; border-left: 4px solid #4CAF50; }
+        .info { background: #e3f2fd; color: #1565c0; border-left: 4px solid #2196F3; }
+        
+        .row { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+        .status-indicator { 
+            padding: 4px 8px; 
+            border-radius: 12px; 
+            font-size: 12px; 
+            font-weight: 500; 
+            margin-left: auto;
+        }
+        .status-pending { background: #fff3e0; color: #f57c00; }
+        .status-ready { background: #e8f5e8; color: #2e7d32; }
+        .status-completed { background: #e3f2fd; color: #1565c0; }
+        
+        .workflow-overview { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-bottom: 30px; 
+            border-left: 4px solid #667eea;
+        }
+        .workflow-overview h3 { margin-top: 0; color: #333; }
+        .workflow-overview ol { margin: 10px 0; padding-left: 20px; }
+        .workflow-overview li { margin: 5px 0; color: #555; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebAuthn Passwordless Authentication Workflow</h1>
+
+        <div class="workflow-overview">
+            <h3>Complete Authentication Workflow Test</h3>
+            <p>This guided workflow will walk you through the complete passwordless authentication process:</p>
+            <ol>
+                <li><strong>Device Registration:</strong> Register your device (fingerprint, Face ID, security key)</li>
+                <li><strong>Authentication:</strong> Login using your registered device</li> 
+                <li><strong>JWT Session:</strong> Use JWT cookies for protected API access</li>
+                <li><strong>Token Management:</strong> Refresh tokens and logout</li>
+            </ol>
+            <p><strong>Note:</strong> Keep this browser tab open throughout the entire workflow to maintain session cookies.</p>
+        </div>
+
+        <!-- STEP 1: DEVICE REGISTRATION -->
+        <div class="workflow-step active" id="step1">
+            <div class="step-header">
+                <div class="step-number active" id="step1-number">1</div>
+                <div>
+                    <div>Device Registration</div>
+                    <div class="status-indicator status-pending" id="step1-status">Ready to start</div>
+                </div>
+            </div>
+            <div class="step-content">
+                <div class="step-description">
+                    Register your device (biometric sensor, security key, etc.) for passwordless authentication. 
+                    This creates a cryptographic key pair unique to your device and this website.
+                </div>
+                <div class="row">
+                    <input id="registerEmail" placeholder="Enter your email address" value="test@example.com" />
+                    <button class="btn-primary" id="btnGetReg">Get Registration Options</button>
+                    <button class="btn-primary" id="btnCompleteReg" disabled>Complete Registration</button>
+                </div>
+                <div id="registerResult" class="result"></div>
+            </div>
+        </div>
+
+        <!-- STEP 2: AUTHENTICATION -->
+        <div class="workflow-step disabled" id="step2">
+            <div class="step-header">
+                <div class="step-number" id="step2-number">2</div>
+                <div>
+                    <div>Device Authentication</div>
+                    <div class="status-indicator status-pending" id="step2-status">Complete step 1 first</div>
+                </div>
+            </div>
+            <div class="step-content">
+                <div class="step-description">
+                    Authenticate using your registered device. This proves you have access to the device 
+                    and generates JWT access/refresh tokens stored as secure HTTP-only cookies.
+                </div>
+                <div class="row">
+                    <input id="loginEmail" placeholder="Enter your email address" value="test@example.com" />
+                    <button class="btn-secondary" id="btnGetLogin" disabled>Get Login Options</button>
+                    <button class="btn-secondary" id="btnCompleteLogin" disabled>Complete Authentication</button>
+                </div>
+                <div id="loginResult" class="result"></div>
+            </div>
+        </div>
+
+        <!-- STEP 3: JWT SESSION USAGE -->
+        <div class="workflow-step disabled" id="step3">
+            <div class="step-header">
+                <div class="step-number" id="step3-number">3</div>
+                <div>
+                    <div>JWT Session Usage</div>
+                    <div class="status-indicator status-pending" id="step3-status">Complete step 2 first</div>
+                </div>
+            </div>
+            <div class="step-content">
+                <div class="step-description">
+                    Test protected API endpoints using your JWT session cookies. The server automatically 
+                    validates your access token on each request.
+                </div>
+                <div class="row">
+                    <button class="btn-accent" id="btnProtected" disabled>Call Protected Endpoint</button>
+                    <button class="btn-muted" id="btnShowCookies">Show Current Cookies</button>
+                </div>
+                <div id="jwtResult" class="result"></div>
+            </div>
+        </div>
+
+        <!-- STEP 4: TOKEN MANAGEMENT -->
+        <div class="workflow-step disabled" id="step4">
+            <div class="step-header">
+                <div class="step-number" id="step4-number">4</div>
+                <div>
+                    <div>Token Management</div>
+                    <div class="status-indicator status-pending" id="step4-status">Complete step 3 first</div>
+                </div>
+            </div>
+            <div class="step-content">
+                <div class="step-description">
+                    Manage your session: refresh expired access tokens using your refresh token, 
+                    or logout to clear all authentication cookies.
+                </div>
+                <div class="row">
+                    <button class="btn-accent" id="btnRefresh" disabled>Refresh Access Token</button>
+                    <button class="btn-muted" id="btnLogout" disabled>Logout & Clear Session</button>
+                </div>
+                <div id="tokenResult" class="result"></div>
+            </div>
+        </div>
+
+    </div>
+
+<script>
+// API base URL for all webauthn and jwt endpoints
+const API_BASE = 'http://localhost:8000';
+
+//////////////////////////////////////////////////////////////////////////
+// Workflow state management - tracks completion of each step in the workflow
+// this ensures users follow the proper sequence and prevents skipping steps
+
+let workflowState = {
+    step1: { completed: false },  // device registration completed
+    step2: { completed: false },  // authentication completed  
+    step3: { completed: false },  // jwt session usage completed
+    step4: { completed: false }   // token management completed
+};
+
+// Pending options for step-by-step flows, these hold the options between get/complete calls
+// we need to store these because webauthn requires a two-step process
+let regOptions = null;    // stores registration options from server between get and complete
+let authOptions = null;   // stores authentication options from server between get and complete
+
+//////////////////////////////////////////////////////////////////////////
+// utility functions for ui management and data conversion
+
+// helper function to display messages to the user in the result areas
+// shows success, error, or info messages with proper styling
+function showResult(id, text, type = 'info') {
+    const el = document.getElementById(id);
+    el.className = `result ${type}`;
+    // convert objects to readable json, keep strings as-is
+    el.textContent = typeof text === 'string' ? text : JSON.stringify(text, null, 2);
+    el.style.display = 'block';
+}
+
+// function to update the visual status of workflow steps
+// manages the step appearance, number badges, and status indicators
+function updateStepStatus(stepId, status, statusText) {
+    const step = document.getElementById(stepId);
+    const number = document.getElementById(`${stepId}-number`);
+    const statusEl = document.getElementById(`${stepId}-status`);
+    
+    // clear all previous states before applying new ones
+    step.classList.remove('active', 'completed', 'disabled');
+    number.classList.remove('active', 'completed');
+    statusEl.classList.remove('status-pending', 'status-ready', 'status-completed');
+    
+    // apply the new status styling
+    if (status === 'active') {
+        step.classList.add('active');
+        number.classList.add('active');
+        statusEl.classList.add('status-ready');
+    } else if (status === 'completed') {
+        step.classList.add('completed');
+        number.classList.add('completed');
+        statusEl.classList.add('status-completed');
+    } else if (status === 'disabled') {
+        step.classList.add('disabled');
+        statusEl.classList.add('status-pending');
+    }
+    
+    statusEl.textContent = statusText;
+}
+
+// function to enable the next step in the workflow sequence
+// marks current step as completed and unlocks the next step
+function enableNextStep(currentStep) {
+    workflowState[currentStep].completed = true;
+    
+    // update current step to completed state
+    updateStepStatus(currentStep, 'completed', '✅ Completed');
+    
+    // enable next step in sequence
+    const stepMap = { step1: 'step2', step2: 'step3', step3: 'step4' };
+    const nextStep = stepMap[currentStep];
+    
+    if (nextStep) {
+        updateStepStatus(nextStep, 'active', 'Ready to proceed');
+        enableStepButtons(nextStep);
+    }
+}
+
+// function to enable buttons for a specific step
+// each step has different buttons that should be enabled when that step becomes active
+function enableStepButtons(stepId) {
+    const buttonMap = {
+        step2: ['btnGetLogin'],                    // authentication step
+        step3: ['btnProtected'],                   // jwt session step
+        step4: ['btnRefresh', 'btnLogout']         // token management step
+    };
+    
+    const buttons = buttonMap[stepId] || [];
+    buttons.forEach(btnId => {
+        document.getElementById(btnId).disabled = false;
+    });
+}
+
+//////////////////////////////////////////////////////////////////////////
+// base64url conversion helpers for webauthn data exchange
+// webauthn apis use arraybuffers but json requires strings, so we convert between formats
+
+// helper function to convert ArrayBuffer to base64url
+// webauthn browser apis return ArrayBuffers but JSON requires strings
+function bufferToBase64url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let str = '';
+    // convert each byte to a character
+    for (const c of bytes) str += String.fromCharCode(c);
+    // convert to base64 and make it url safe (replace + with -, / with _, remove =)
+    const b64 = btoa(str);
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// helper function to convert base64url to ArrayBuffer
+// server sends base64url strings but webauthn apis need ArrayBuffers
+function base64urlToBuffer(base64url) {
+    // convert base64url to base64 (reverse the url safe conversion)
+    const b64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    // add padding if needed (base64 strings must be divisible by 4)
+    const pad = (4 - (b64.length % 4)) % 4;
+    const padded = b64 + '='.repeat(pad);
+    // convert to binary string using browser built-in
+    const binary = atob(padded);
+    // create ArrayBuffer and fill it with the binary data
+    const buffer = new ArrayBuffer(binary.length);
+    const view = new Uint8Array(buffer);
+    // copy each character code to the byte array
+    for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+    return buffer;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// step 1: device registration workflow
+// this creates a new credential on the user's device for passwordless authentication
+
+// event listener for get registration options button
+document.getElementById('btnGetReg').addEventListener('click', async () => {
+    const email = document.getElementById('registerEmail').value.trim();
+    if (!email) return showResult('registerResult', 'Please enter a valid email address', 'error');
+    
+    showResult('registerResult', 'Fetching registration options from server...', 'info');
+    updateStepStatus('step1', 'active', '🔄 Getting options...');
+    
+    try {
+        // get registration options from server including challenge and user info
+        const res = await fetch(`${API_BASE}/webauthn/register/options?email=${encodeURIComponent(email)}`);
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        
+        const opts = await res.json();
+        
+        // convert base64url strings to ArrayBuffers for webauthn api
+        // webauthn apis expect binary data not strings, so we convert here
+        opts.user.id = base64urlToBuffer(opts.user.id);
+        opts.challenge = base64urlToBuffer(opts.challenge);
+        if (opts.excludeCredentials) {
+            opts.excludeCredentials.forEach(c => c.id = base64urlToBuffer(c.id));
+        }
+        
+        // store options for the complete registration step
+        regOptions = { email, publicKey: opts };
+        document.getElementById('btnCompleteReg').disabled = false;
+        updateStepStatus('step1', 'active', '🔑 Ready for device registration');
+        showResult('registerResult', 
+            'Registration options received successfully!\n\n✅ Server challenge validated\n✅ User credentials prepared\n\nClick "Complete Registration" to register your device.', 
+            'success');
+            
+    } catch (e) {
+        console.error(e);
+        updateStepStatus('step1', 'active', '❌ Failed to get options');
+        showResult('registerResult', `Failed to get registration options:\n${e.message}`, 'error');
+    }
+});
+
+// event listener for complete registration button
+document.getElementById('btnCompleteReg').addEventListener('click', async () => {
+    if (!regOptions) return showResult('registerResult', 'No pending registration options', 'error');
+    
+    showResult('registerResult', 'Requesting device registration (please authenticate)...', 'info');
+    updateStepStatus('step1', 'active', '🔐 Waiting for device...');
+    
+    try {
+        // call webauthn api to create new credential
+        // this will prompt the user for biometrics, security key, etc
+        const cred = await navigator.credentials.create({ publicKey: regOptions.publicKey });
+        
+        // convert ArrayBuffers back to base64url for sending to server
+        // the server expects strings in JSON, not binary data
+        const payload = {
+            id: cred.id,
+            rawId: bufferToBase64url(cred.rawId),
+            response: {
+                attestationObject: bufferToBase64url(cred.response.attestationObject),
+                clientDataJSON: bufferToBase64url(cred.response.clientDataJSON),
+            },
+            type: cred.type
+        };
+        
+        showResult('registerResult', 'Verifying registration on server...', 'info');
+        updateStepStatus('step1', 'active', '✅ Device authenticated, verifying...');
+        
+        // send to verification endpoint for server-side validation
+        // server will verify the credential and store it in the database
+        const res = await fetch(`${API_BASE}/webauthn/register/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',  // include cookies for session management
+            body: JSON.stringify({ Email: regOptions.email, credential: payload })
+        });
+        
+        const body = await res.json();
+        if (!res.ok) throw new Error(JSON.stringify(body));
+        
+        showResult('registerResult', 
+            `🎉 Device registration successful!\n\n✅ Device registered for: ${regOptions.email}\n✅ Cryptographic key pair created\n✅ Ready for authentication\n\nResponse: ${JSON.stringify(body, null, 2)}`, 
+            'success');
+            
+        // clean up state and enable next step
+        regOptions = null;
+        document.getElementById('btnCompleteReg').disabled = true;
+        enableNextStep('step1');
+        
+    } catch (e) {
+        console.error(e);
+        updateStepStatus('step1', 'active', '❌ Registration failed');
+        showResult('registerResult', `Device registration failed:\n${e.message}`, 'error');
+    }
+});
+
+//////////////////////////////////////////////////////////////////////////
+// step 2: authentication workflow  
+// this authenticates the user with their registered device and creates jwt session
+
+// event listener for get authentication options button
+document.getElementById('btnGetLogin').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmail').value.trim();
+    if (!email) return showResult('loginResult', 'Please enter a valid email address', 'error');
+    
+    showResult('loginResult', 'Fetching authentication options...', 'info');
+    updateStepStatus('step2', 'active', '🔄 Getting auth options...');
+    
+    try {
+        // get authentication options from server
+        // this includes the challenge and list of allowed credentials for this user
+        const res = await fetch(`${API_BASE}/webauthn/login/options?email=${encodeURIComponent(email)}`);
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        
+        const opts = await res.json();
+        // convert base64url strings to ArrayBuffers for webauthn api
+        opts.challenge = base64urlToBuffer(opts.challenge);
+        if (opts.allowCredentials) {
+            opts.allowCredentials.forEach(c => c.id = base64urlToBuffer(c.id));
+        }
+        
+        // store options for the complete authentication step
+        authOptions = { email, publicKey: opts };
+        document.getElementById('btnCompleteLogin').disabled = false;
+        updateStepStatus('step2', 'active', '🔑 Ready for authentication');
+        showResult('loginResult', 
+            'Authentication options received!\n\n✅ Found registered device(s)\n✅ Challenge prepared\n\nClick "Complete Authentication" to login.', 
+            'success');
+            
+    } catch (e) {
+        console.error(e);
+        updateStepStatus('step2', 'active', '❌ Failed to get auth options');
+        showResult('loginResult', `Failed to get authentication options:\n${e.message}`, 'error');
+    }
+});
+
+// event listener for complete authentication button
+document.getElementById('btnCompleteLogin').addEventListener('click', async () => {
+    if (!authOptions) return showResult('loginResult', 'No pending authentication options', 'error');
+    
+    showResult('loginResult', 'Requesting device authentication (please authenticate)...', 'info');
+    updateStepStatus('step2', 'active', '🔐 Waiting for device...');
+    
+    try {
+        // call webauthn api to authenticate with existing credential
+        // this will prompt the user to use the same method they registered with
+        const cred = await navigator.credentials.get({ publicKey: authOptions.publicKey });
+        
+        // convert ArrayBuffers back to base64url for sending to server
+        const payload = {
+            id: cred.id,
+            rawId: bufferToBase64url(cred.rawId),
+            response: {
+                authenticatorData: bufferToBase64url(cred.response.authenticatorData),
+                clientDataJSON: bufferToBase64url(cred.response.clientDataJSON),
+                signature: bufferToBase64url(cred.response.signature)
+            },
+            type: cred.type
+        };
+        
+        showResult('loginResult', 'Verifying authentication on server...', 'info');
+        updateStepStatus('step2', 'active', '✅ Device authenticated, verifying...');
+        
+        // send to verification endpoint for server-side validation
+        // server will verify the signature and create jwt tokens as cookies
+        const res = await fetch(`${API_BASE}/webauthn/login/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',  // crucial for receiving the jwt cookies
+            body: JSON.stringify({ email: authOptions.email, credential: payload })
+        });
+        
+        const body = await res.json();
+        if (!res.ok) throw new Error(JSON.stringify(body));
+        
+        showResult('loginResult', 
+            `🎉 Authentication successful!\n\n✅ Device verified\n✅ JWT tokens issued\n✅ Session established\n\nResponse: ${JSON.stringify(body, null, 2)}`, 
+            'success');
+            
+        // clean up state and enable next step
+        authOptions = null;
+        document.getElementById('btnCompleteLogin').disabled = true;
+        enableNextStep('step2');
+        
+    } catch (e) {
+        console.error(e);
+        updateStepStatus('step2', 'active', '❌ Authentication failed');
+        showResult('loginResult', `Authentication failed:\n${e.message}`, 'error');
+    }
+});
+
+//////////////////////////////////////////////////////////////////////////
+// step 3: jwt session usage
+// this tests the jwt session by calling protected endpoints that require authentication
+
+// event listener for protected endpoint test button
+document.getElementById('btnProtected').addEventListener('click', async () => {
+    showResult('jwtResult', 'Calling protected endpoint...', 'info');
+    updateStepStatus('step3', 'active', '🔄 Testing JWT session...');
+    
+    try {
+        // call protected endpoint which reads and validates the access_token cookie
+        // the server dependency will automatically validate the jwt token
+        const res = await fetch(`${API_BASE}/protected`, { credentials: 'include' });
+        const body = await res.json();
+        if (!res.ok) throw new Error(JSON.stringify(body));
+        
+        showResult('jwtResult', 
+            `🎉 Protected endpoint access successful!\n\n✅ JWT access token validated\n✅ User session active\n\nResponse: ${JSON.stringify(body, null, 2)}`, 
+            'success');
+        enableNextStep('step3');
+        
+    } catch (e) {
+        console.error(e);
+        updateStepStatus('step3', 'active', '❌ JWT validation failed');
+        showResult('jwtResult', `Protected endpoint failed:\n${e.message}`, 'error');
+    }
+});
+
+//////////////////////////////////////////////////////////////////////////
+// step 4: token management
+// this handles jwt token refresh and logout functionality
+
+// event listener for refresh token button
+document.getElementById('btnRefresh').addEventListener('click', async () => {
+    showResult('tokenResult', 'Refreshing access token...', 'info');
+    
+    try {
+        // call refresh endpoint to exchange refresh_token cookie for new access_token
+        // this allows extending the session without re-authentication
+        const res = await fetch(`${API_BASE}/auth/refresh`, { method: 'POST', credentials: 'include' });
+        const body = await res.json();
+        if (!res.ok) throw new Error(JSON.stringify(body));
+        
+        showResult('tokenResult', 
+            `🔄 Access token refreshed successfully!\n\n✅ New access token issued\n✅ Session extended\n\nResponse: ${JSON.stringify(body, null, 2)}`, 
+            'success');
+            
+    } catch (e) {
+        console.error(e);
+        showResult('tokenResult', `Token refresh failed:\n${e.message}`, 'error');
+    }
+});
+
+// event listener for logout button
+document.getElementById('btnLogout').addEventListener('click', async () => {
+    showResult('tokenResult', 'Logging out...', 'info');
+    
+    try {
+        // call logout endpoint to clear all authentication cookies
+        // this terminates the jwt session on both client and server side
+        const res = await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' });
+        const body = await res.json();
+        if (!res.ok) throw new Error(JSON.stringify(body));
+        
+        showResult('tokenResult', 
+            `👋 Logout successful!\n\n✅ All cookies cleared\n✅ Session terminated\n\nResponse: ${JSON.stringify(body, null, 2)}`, 
+            'success');
+            
+        // reset workflow to allow testing again after a short delay
+        setTimeout(() => {
+            location.reload();
+        }, 2000);
+        
+    } catch (e) {
+        console.error(e);
+        showResult('tokenResult', `Logout failed:\n${e.message}`, 'error');
+    }
+});
+
+// event listener for show cookies button - utility for debugging
+document.getElementById('btnShowCookies').addEventListener('click', () => {
+    const cookies = document.cookie || '(no cookies found)';
+    showResult('jwtResult', `Current browser cookies:\n\n${cookies}`, 'info');
+});
+
+//////////////////////////////////////////////////////////////////////////
+// initialization function - sets up the initial workflow state when page loads
+
+document.addEventListener('DOMContentLoaded', () => {
+    // initialize workflow with step 1 active and all others disabled
+    updateStepStatus('step1', 'active', 'Ready to start');
+    updateStepStatus('step2', 'disabled', 'Complete step 1 first');
+    updateStepStatus('step3', 'disabled', 'Complete step 2 first');
+    updateStepStatus('step4', 'disabled', 'Complete step 3 first');
+});
+
+</script>
+</body>
+</html>
